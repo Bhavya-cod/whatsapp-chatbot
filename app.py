@@ -1,19 +1,22 @@
 import os
-
-TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
-TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
-TWILIO_PHONE_NUMBER = os.getenv("TWILIO_PHONE_NUMBER")
-
 from flask import Flask, request
 from twilio.twiml.messaging_response import MessagingResponse
 import pandas as pd
+
+# Twilio Credentials from Environment Variables
+TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
+TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
+TWILIO_PHONE_NUMBER = os.getenv("TWILIO_PHONE_NUMBER")
 
 app = Flask(__name__)
 
 # Load the dataset
 file_path = "pesticides.xlsx"
-xls = pd.ExcelFile(file_path)
-data_sheets = {sheet: pd.read_excel(xls, sheet_name=sheet) for sheet in xls.sheet_names}
+if os.path.exists(file_path):
+    xls = pd.ExcelFile(file_path)
+    data_sheets = {sheet: pd.read_excel(xls, sheet_name=sheet) for sheet in xls.sheet_names}
+else:
+    data_sheets = {}
 
 # Language dictionary
 responses = {
@@ -65,11 +68,14 @@ def whatsapp_bot():
     elif session["step"] == "crop":
         session["crop"] = incoming_msg
         session["step"] = "category"
-        categories = list(data_sheets.keys())
+        categories = list(data_sheets.keys()) if data_sheets else []
         session["categories"] = categories
-        msg.body(responses[session["lang"]]["ask_category"] + "\n" + 
-                 "\n".join([f"{i+1}. {c}" for i, c in enumerate(categories)]))
-    
+        if categories:
+            msg.body(responses[session["lang"]]["ask_category"] + "\n" + 
+                     "\n".join([f"{i+1}. {c}" for i, c in enumerate(categories)]))
+        else:
+            msg.body("⚠️ No pesticide data available. Please upload `pesticides.xlsx`.")
+
     elif session["step"] == "category":
         try:
             index = int(incoming_msg) - 1
@@ -118,4 +124,5 @@ def whatsapp_bot():
     return str(resp)
 
 if __name__ == "__main__":
-    app.run(port=5000)
+    PORT = int(os.environ.get("PORT", 5000))  # Default to 5000
+    app.run(host="0.0.0.0", port=PORT, debug=True)
