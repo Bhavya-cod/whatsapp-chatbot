@@ -3,3 +3,4 @@ twilio==8.9.1
 requests==2.31.0
 gunicorn
 pandas
+openpyxl
